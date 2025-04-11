@@ -2,9 +2,9 @@
   "name": "relatory",
   "version": "1.0.0",
   "scripts": {
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "start": "expo start -c",
     "prebuild": "expo prebuild",
     "lint": "eslint \"**/*.{js,jsx,ts,tsx}\" && prettier -c \"**/*.{js,jsx,ts,tsx,json}\"",
     "format": "eslint \"**/*.{js,jsx,ts,tsx}\" --fix && prettier \"**/*.{js,jsx,ts,tsx,json}\" --write",
@@ -13,6 +13,7 @@
   "dependencies": {
     "expo": "^52.0.44",
     "expo-status-bar": "~2.0.1",
+    "expo-system-ui": "^4.0.9",
     "nativewind": "latest",
     "react": "18.3.1",
     "react-native": "0.76.9",
