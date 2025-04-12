@@ -1,42 +1,36 @@
-// src/screens/ManifestFormScreen.tsx
-import { yupResolver } from '@hookform/resolvers/yup';
-import React, { useEffect, useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import React from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { View, ScrollView } from 'react-native';
-import {
-  TextInput,
-  Button,
-  RadioButton,
-  Text,
-  HelperText,
-  Menu,
-  Provider,
-} from 'react-native-paper';
-import * as yup from 'yup';
+import { TextInput, Button, RadioButton, Text, HelperText, Provider } from 'react-native-paper';
+import { z } from 'zod';
 
-import { initDatabase } from '@/src/services/db';
-
-const schema = yup.object({
-  productName: yup.string().required('Nome do produto é obrigatório'),
-  quantity: yup.number().positive().required('Quantidade obrigatória'),
-  unit: yup.string().required('Unidade obrigatória'),
-  type: yup.string().oneOf(['entrada', 'saida']).required('Tipo obrigatório'),
-  date: yup.string().required('Data obrigatória'),
-  responsible: yup.string().required('Responsável obrigatório'),
-  observations: yup.string().optional(),
+const schema = z.object({
+  productName: z.string().min(1, 'Nome do produto é obrigatório'),
+  lote: z.string().min(1, 'Lote obrigatório'),
+  unit: z.string().min(1, 'Unidade obrigatória'),
+  type: z.enum(['entrada', 'saida'], {
+    required_error: 'Tipo obrigatório',
+  }),
+  date: z.string().min(1, 'Data obrigatória'),
+  responsible: z.string().min(1, 'Responsável obrigatório'),
+  observations: z.string().optional(),
 });
+
+type ManifestForm = z.infer<typeof schema>;
 
 export default function ManifestFormScreen() {
   const {
     control,
     handleSubmit,
     formState: { errors },
-    setValue,
-  } = useForm({
-    resolver: yupResolver(schema),
+  } = useForm<ManifestForm>({
+    resolver: zodResolver(schema),
     defaultValues: {
       productName: '',
-      quantity: 0,
+      lote: '',
       unit: '',
       type: 'entrada',
       date: new Date().toISOString().split('T')[0],
@@ -45,25 +39,44 @@ export default function ManifestFormScreen() {
     },
   });
 
-  const [unitMenuVisible, setUnitMenuVisible] = useState(false);
+  const onSubmit = async (data: ManifestForm) => {
+    try {
+      const htmlContent = `
+        <html>
+          <body style="font-family: Arial; padding: 24px;">
+            <h1>Manifesto de Produto</h1>
+            <p><strong>Produto:</strong> ${data.productName}</p>
+            <p><strong>Lote:</strong> ${data.lote}</p>
+            <p><strong>Unidade:</strong> ${data.unit}</p>
+            <p><strong>Tipo:</strong> ${data.type}</p>
+            <p><strong>Data:</strong> ${data.date}</p>
+            <p><strong>Responsável:</strong> ${data.responsible}</p>
+            <p><strong>Observações:</strong> ${data.observations || 'Nenhuma'}</p>
+          </body>
+        </html>
+      `;
 
-  useEffect(() => {
-    initDatabase();
-  }, []);
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
 
-  const onSubmit = (data: any) => {
-    insertManifest(data, () => {
-      alert('Manifesto salvo com sucesso!');
-    });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri);
+      } else {
+        alert('Compartilhamento não disponível neste dispositivo');
+      }
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      alert('Erro ao gerar PDF');
+    }
   };
 
   return (
     <Provider>
-      <ScrollView contentContainerStyle={{ padding: 20 }}>
+      <ScrollView contentContainerStyle={{ padding: 24 }}>
         <Text variant="titleLarge" style={{ marginBottom: 20 }}>
           Novo Manifesto
         </Text>
 
+        {/* Nome do Produto */}
         <Controller
           control={control}
           name="productName"
@@ -81,59 +94,43 @@ export default function ManifestFormScreen() {
           {errors.productName?.message}
         </HelperText>
 
+        {/* Lote */}
         <Controller
           control={control}
-          name="quantity"
+          name="lote"
           render={({ field: { onChange, value } }) => (
             <TextInput
-              label="Quantidade"
+              label="Lote"
               mode="outlined"
-              keyboardType="numeric"
-              value={value?.toString()}
+              value={value}
               onChangeText={onChange}
-              error={!!errors.quantity}
+              error={!!errors.lote}
             />
           )}
         />
-        <HelperText type="error" visible={!!errors.quantity}>
-          {errors.quantity?.message}
+        <HelperText type="error" visible={!!errors.lote}>
+          {errors.lote?.message}
         </HelperText>
 
-        <Menu
-          visible={unitMenuVisible}
-          onDismiss={() => setUnitMenuVisible(false)}
-          anchor={
-            <Controller
-              control={control}
-              name="unit"
-              render={({ field: { onChange, value } }) => (
-                <TextInput
-                  label="Unidade"
-                  mode="outlined"
-                  value={value}
-                  onFocus={() => setUnitMenuVisible(true)}
-                  right={<TextInput.Icon icon="menu-down" />}
-                  editable={false}
-                  error={!!errors.unit}
-                />
-              )}
+        {/* Unidade */}
+        <Controller
+          control={control}
+          name="unit"
+          render={({ field: { onChange, value } }) => (
+            <TextInput
+              label="Unidade"
+              mode="outlined"
+              value={value}
+              onChangeText={onChange}
+              error={!!errors.unit}
             />
-          }>
-          {['kg', 'un', 'l'].map((u) => (
-            <Menu.Item
-              key={u}
-              onPress={() => {
-                setValue('unit', u);
-                setUnitMenuVisible(false);
-              }}
-              title={u.toUpperCase()}
-            />
-          ))}
-        </Menu>
+          )}
+        />
         <HelperText type="error" visible={!!errors.unit}>
           {errors.unit?.message}
         </HelperText>
 
+        {/* Tipo */}
         <Text style={{ marginTop: 10, marginBottom: 5 }}>Tipo:</Text>
         <Controller
           control={control}
@@ -153,6 +150,7 @@ export default function ManifestFormScreen() {
           {errors.type?.message}
         </HelperText>
 
+        {/* Responsável */}
         <Controller
           control={control}
           name="responsible"
@@ -170,6 +168,7 @@ export default function ManifestFormScreen() {
           {errors.responsible?.message}
         </HelperText>
 
+        {/* Data */}
         <Controller
           control={control}
           name="date"
@@ -187,6 +186,7 @@ export default function ManifestFormScreen() {
           {errors.date?.message}
         </HelperText>
 
+        {/* Observações */}
         <Controller
           control={control}
           name="observations"
@@ -203,12 +203,9 @@ export default function ManifestFormScreen() {
         />
 
         <Button mode="contained" style={{ marginTop: 20 }} onPress={handleSubmit(onSubmit)}>
-          Gerar Manifesto
+          Gerar PDF
         </Button>
       </ScrollView>
     </Provider>
   );
-}
-function insertManifest(data: any, arg1: () => void) {
-  throw new Error('Function not implemented.');
 }
