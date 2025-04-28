@@ -2,7 +2,7 @@
   "expo": {
     "name": "relatory",
     "slug": "relatory",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "web": {
       "favicon": "./assets/favicon.png"
     },
@@ -12,12 +12,8 @@
     "plugins": [],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
+    "userInterfaceStyle": "auto",
+
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,

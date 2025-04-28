@@ -1,7 +1,13 @@
 import { StatusBar } from 'expo-status-bar';
+import { preventAutoHideAsync, hideAsync } from 'expo-splash-screen';
 
 import './global.css';
 import Home from '@/app/index';
+
+preventAutoHideAsync(); // Evita que a Splash Screen suma automaticamente
+
+// Depois, quando seu app estiver pronto:
+hideAsync();
 
 export default function App() {
   return (

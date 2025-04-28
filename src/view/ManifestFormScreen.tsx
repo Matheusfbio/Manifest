@@ -1,12 +1,11 @@
-// ... (todos os imports permanecem iguais)
-
 import { zodResolver } from '@hookform/resolvers/zod';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import React, { useState, useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { FlatList, Modal, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, FlatList, Modal, ScrollView, StyleSheet, View } from 'react-native';
 import {
   TextInput,
   Button,
@@ -19,7 +18,6 @@ import {
 import { z } from 'zod';
 
 const STORAGE_KEY = '@manifest_products';
-/// ... (todos os imports permanecem iguais)
 
 type ManifestForm = {
   productName: string;
@@ -127,7 +125,7 @@ export default function ManifestFormScreen() {
 
   const onSubmitGeneratePDF = async () => {
     if (products.length === 0) {
-      alert('Adicione ao menos um produto para gerar o PDF');
+      Alert.alert('Atenção', 'Adicione ao menos um produto para gerar o PDF');
       return;
     }
 
@@ -142,8 +140,8 @@ export default function ManifestFormScreen() {
             <p><strong>Tipo:</strong> ${p.type}</p>
             <p><strong>Data:</strong> ${p.date}</p>
             <p><strong>Validade:</strong> ${p.validade}</p>
-            <p><strong>Responsável:</strong> ${p.responsible}</p>
-            <p><strong>Observações:</strong> ${p.observations || 'Nenhuma'}</p>
+            <p><strong>Responsavel:</strong> ${p.responsible}</p>
+            <p><strong>Obsercacoes:</strong> ${p.observations || 'Nenhuma'}</p>
             <hr />
           `
         )
@@ -169,6 +167,49 @@ export default function ManifestFormScreen() {
       alert('Erro ao gerar PDF');
     }
   };
+  const onSaveCsvFile = async () => {
+    if (products.length === 0) {
+      alert('Adicione ao menos um produto para gerar o CSV');
+      return;
+    }
+  
+    try {
+      const csvHeader = 'Produto,Lote,Unidade,Tipo,Data,Validade,Responsavel,Observacoes\n';
+      const csvRows = products
+        .map((p) =>
+          [
+            p.productName,
+            p.lote,
+            p.unit,
+            p.type,
+            p.date,
+            p.validade,
+            p.responsible,
+            p.observations ? p.observations.replace(/\n/g, ' ') : 'Nenhuma',
+          ]
+            .map((field) => `"${field}"`)
+            .join(',')
+        )
+        .join('\n');
+  
+      const csvContent = csvHeader + csvRows;
+  
+      const fileUri = FileSystem.documentDirectory + 'manifesto_produtos.csv';
+      await FileSystem.writeAsStringAsync(fileUri, csvContent, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+  
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
+      } else {
+        alert('Arquivo CSV gerado em: ' + fileUri);
+      }
+    } catch (error) {
+      console.error('Erro ao gerar CSV:', error);
+      alert('Erro ao gerar CSV');
+    }
+  };
+  
 
   const saveProductsToStorage = async (data: ManifestForm[]) => {
     try {
@@ -204,7 +245,6 @@ export default function ManifestFormScreen() {
           {editingIndex !== null ? 'Editar Produto' : 'Novo Manifesto'}
         </Text>
 
-        {/* Campos do formulário */}
         {[
           { name: 'productName', label: 'Nome do Produto' },
           { name: 'lote', label: 'Lote' },
@@ -233,7 +273,6 @@ export default function ManifestFormScreen() {
           </React.Fragment>
         ))}
 
-        {/* Tipo */}
         <Text style={{ marginTop: 10, marginBottom: 5 }}>Tipo:</Text>
         <Controller
           control={control}
@@ -253,7 +292,6 @@ export default function ManifestFormScreen() {
           {errors.type?.message}
         </HelperText>
 
-        {/* Observações */}
         <Controller
           control={control}
           name="observations"
@@ -269,7 +307,6 @@ export default function ManifestFormScreen() {
           )}
         />
 
-        {/* Botões */}
         <Button
           mode="contained"
           style={{ marginTop: 20 }}
@@ -284,6 +321,11 @@ export default function ManifestFormScreen() {
         <Button mode="contained" style={{ marginTop: 20 }} onPress={onSubmitGeneratePDF}>
           Gerar PDF
         </Button>
+
+        <Button mode="contained" style={{ marginTop: 20 }} onPress={onSaveCsvFile}>
+          Gerar CSV
+        </Button>
+
       </ScrollView>
 
       {/* Modal */}
