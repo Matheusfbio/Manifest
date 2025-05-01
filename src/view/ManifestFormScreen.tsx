@@ -64,6 +64,115 @@ const styles = StyleSheet.create({
   },
 });
 
+const categorizeProducts = (products: ManifestForm[]) => {
+  return {
+    gray: products.filter((p) => Number(p.unit) >= 35),
+    green: products.filter((p) => Number(p.unit) >= 25 && Number(p.unit) < 35),
+    yellow: products.filter((p) => Number(p.unit) >= 15 && Number(p.unit) < 25),
+    red: products.filter((p) => Number(p.unit) < 15),
+  };
+};
+
+const categorizeProductsByDate = (products: ManifestForm[]) => {
+  const today = new Date();
+
+  return {
+    expired: products.filter((p) => new Date(p.validade) < today),
+    nearExpiration: products.filter(
+      (p) =>
+        new Date(p.validade) >= today &&
+        new Date(p.validade) <= new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000) // Próximos 7 dias
+    ),
+    valid: products.filter((p) => new Date(p.validade) > new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)),
+  };
+};
+
+const categorizeProductsWithDays = (products: ManifestForm[]) => {
+  const today = new Date();
+
+  return {
+    gray: products
+      .filter((p) => {
+        const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        return Number(p.unit) >= 35 && daysToExpire > 0;
+      })
+      .map((p) => ({
+        ...p,
+        daysToExpire: Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
+      })),
+    green: products
+      .filter((p) => {
+        const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        return Number(p.unit) >= 25 && Number(p.unit) < 35 && daysToExpire > 0;
+      })
+      .map((p) => ({
+        ...p,
+        daysToExpire: Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
+      })),
+    yellow: products
+      .filter((p) => {
+        const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        return Number(p.unit) >= 15 && Number(p.unit) < 25 && daysToExpire > 0;
+      })
+      .map((p) => ({
+        ...p,
+        daysToExpire: Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
+      })),
+    red: products
+      .filter((p) => {
+        const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        return Number(p.unit) < 15 || daysToExpire <= 0;
+      })
+      .map((p) => ({
+        ...p,
+        daysToExpire: Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
+      })),
+  };
+};
+
+const categorizeProductsByExpiration = (products: ManifestForm[]) => {
+  const today = new Date();
+
+  return {
+    gray: products
+      .filter((p) => {
+        const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        return daysToExpire > 35;
+      })
+      .map((p) => ({
+        ...p,
+        daysToExpire: Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
+      })),
+    green: products
+      .filter((p) => {
+        const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        return daysToExpire > 25 && daysToExpire <= 35;
+      })
+      .map((p) => ({
+        ...p,
+        daysToExpire: Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
+      })),
+    yellow: products
+      .filter((p) => {
+        const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        return daysToExpire > 15 && daysToExpire <= 25;
+      })
+      .map((p) => ({
+        ...p,
+        daysToExpire: Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
+      })),
+    red: products
+      .filter((p) => {
+        const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        return daysToExpire <= 15;
+      })
+      .map((p) => ({
+        ...p,
+        daysToExpire: Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
+      })),
+  };
+};
+
 export default function ManifestFormScreen() {
   const {
     control,
@@ -87,6 +196,7 @@ export default function ManifestFormScreen() {
   const [products, setProducts] = useState<ManifestForm[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  
 
   const onAddOrUpdateProduct = (data: ManifestForm) => {
     if (editingIndex !== null) {
@@ -155,6 +265,7 @@ export default function ManifestFormScreen() {
           </body>
         </html>
       `;
+      
       const { uri } = await Print.printToFileAsync({ html: htmlContent });
 
       if (await Sharing.isAvailableAsync()) {
@@ -167,6 +278,7 @@ export default function ManifestFormScreen() {
       alert('Erro ao gerar PDF');
     }
   };
+  
   const onSaveCsvFile = async () => {
     if (products.length === 0) {
       alert('Adicione ao menos um produto para gerar o CSV');
@@ -240,10 +352,10 @@ export default function ManifestFormScreen() {
 
   return (
     <Provider>
-      <ScrollView contentContainerStyle={{ padding: 24 }}>
-        <Text variant="titleLarge" style={{ marginBottom: 20, marginTop: 60 }}>
-          {editingIndex !== null ? 'Editar Produto' : 'Novo Manifesto'}
-        </Text>
+      <Text variant="titleLarge" style={{ marginLeft: 25, marginBottom: 20, marginTop: 40 }}>
+        {editingIndex !== null ? 'Editar Produto' : 'Novo Manifesto'}
+      </Text>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 24 }}>
 
         {[
           { name: 'productName', label: 'Nome do Produto' },
@@ -338,23 +450,46 @@ export default function ManifestFormScreen() {
           <View style={styles.modalBackground}>
             <View style={styles.modalContainer}>
               <Text style={{ marginBottom: 10, fontSize: 18, fontWeight: 'bold' }}>
-                Produtos adicionados
+                Produtos adicionados (por validade)
               </Text>
-              <FlatList
-                data={products}
-                keyExtractor={(_: ManifestForm, i: number) => i.toString()}
-                renderItem={({ item, index }) => (
-                  <View style={styles.productItem}>
-                    <Text style={{ flex: 1 }}>
-                      {index + 1}. Pt: {item.productName} Un: {item.unit}
-                    </Text>
-                    <Button onPress={() => onEditProduct(index)}>✏️</Button>
-                    <Button onPress={() => onDeleteProduct(index)} textColor="red">
-                      🗑️
-                    </Button>
-                  </View>
-                )}
-              />
+
+              {Object.entries(categorizeProductsByExpiration(products)).map(([category, items]) => (
+                <View key={category} style={{ marginBottom: 20 }}>
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 'bold',
+                      color:
+                        category === 'gray'
+                          ? '#A9A9A9' // Cinza
+                          : category === 'green'
+                          ? '#4CAF50' // Verde
+                          : category === 'yellow'
+                          ? '#FFEB3B' // Amarelo
+                          : '#F44336', // Vermelho
+                    }}>
+                    {category === 'gray'
+                      ? 'Cinza (35 dias ou mais)'
+                      : category === 'green'
+                      ? 'Verde (25 a 35 dias)'
+                      : category === 'yellow'
+                      ? 'Amarelo (15 a 25 dias)'
+                      : 'Vermelho (15 dias ou menos)'}
+                  </Text>
+                  {items.map((item, index) => (
+                    <View key={index} style={styles.productItem}>
+                      <Text style={{ flex: 1 }}>
+                        {index + 1}. Pt: {item.productName} - Faltam {item.daysToExpire} dias para vencer
+                      </Text>
+                      <Button onPress={() => onEditProduct(index)}>✏️</Button>
+                      <Button onPress={() => onDeleteProduct(index)} textColor="red">
+                        🗑️
+                      </Button>
+                    </View>
+                  ))}
+                </View>
+              ))}
+
               <Button
                 onPress={async () => {
                   await AsyncStorage.removeItem(STORAGE_KEY);
