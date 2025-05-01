@@ -240,32 +240,85 @@ export default function ManifestFormScreen() {
     }
 
     try {
+      const today = new Date();
       const htmlRows = products
-        .map(
-          (p, index) => `
-            <h3>Produto ${index + 1}</h3>
-            <p><strong>Produto:</strong> ${p.productName}</p>
-            <p><strong>Lote:</strong> ${p.lote}</p>
-            <p><strong>Unidade:</strong> ${p.unit}</p>
-            <p><strong>Tipo:</strong> ${p.type}</p>
-            <p><strong>Data:</strong> ${p.date}</p>
-            <p><strong>Validade:</strong> ${p.validade}</p>
-            <p><strong>Responsavel:</strong> ${p.responsible}</p>
-            <p><strong>Obsercacoes:</strong> ${p.observations || 'Nenhuma'}</p>
-            <hr />
-          `
-        )
+        .map((p, index) => {
+          const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          const color =
+            daysToExpire > 35
+              ? '#A9A9A9' // Cinza
+              : daysToExpire > 25
+              ? '#4CAF50' // Verde
+              : daysToExpire > 15
+              ? '#FFEB3B' // Amarelo
+              : '#F44336'; // Vermelho
+
+          return `
+            <tr style="color: ${color}">
+              <td>${index + 1}</td>
+              <td>${p.productName}</td>
+              <td>${p.lote}</td>
+              <td>${p.unit}</td>
+              <td>${p.type}</td>
+              <td>${p.date}</td>
+              <td>${p.validade}</td>
+              <td>${daysToExpire > 0 ? `${daysToExpire} dias` : 'Vencido'}</td>
+              <td>${p.responsible}</td>
+              <td>${p.observations || 'Nenhuma'}</td>
+            </tr>
+          `;
+        })
         .join('');
 
       const htmlContent = `
         <html>
-          <body style="font-family: Arial; padding: 24px;">
+          <head>
+            <style>
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+              }
+              th, td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+              }
+              th {
+                background-color: #f4f4f4;
+                font-weight: bold;
+              }
+              h1 {
+                text-align: center;
+                font-family: Arial, sans-serif;
+              }
+            </style>
+          </head>
+          <body>
             <h1>Manifesto de Produtos</h1>
-            ${htmlRows}
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Produto</th>
+                  <th>Lote</th>
+                  <th>Unidade</th>
+                  <th>Tipo</th>
+                  <th>Data</th>
+                  <th>Validade</th>
+                  <th>Dias para Vencer</th>
+                  <th>Responsável</th>
+                  <th>Observações</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${htmlRows}
+              </tbody>
+            </table>
           </body>
         </html>
       `;
-      
+
       const { uri } = await Print.printToFileAsync({ html: htmlContent });
 
       if (await Sharing.isAvailableAsync()) {
@@ -286,22 +339,26 @@ export default function ManifestFormScreen() {
     }
   
     try {
-      const csvHeader = 'Produto,Lote,Unidade,Tipo,Data,Validade,Responsavel,Observacoes\n';
+      const today = new Date();
+      const csvHeader = 'ID,Produto,Lote,Unidade,Tipo,Data,Validade,Dias para Vencer,Responsável,Observações\n';
       const csvRows = products
-        .map((p) =>
-          [
+        .map((p, index) => {
+          const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          return [
+            index + 1,
             p.productName,
             p.lote,
             p.unit,
             p.type,
             p.date,
             p.validade,
+            daysToExpire > 0 ? `${daysToExpire} dias` : 'Vencido',
             p.responsible,
             p.observations ? p.observations.replace(/\n/g, ' ') : 'Nenhuma',
           ]
             .map((field) => `"${field}"`)
-            .join(',')
-        )
+            .join(',');
+        })
         .join('\n');
   
       const csvContent = csvHeader + csvRows;
@@ -429,14 +486,15 @@ export default function ManifestFormScreen() {
         <Button mode="outlined" onPress={() => setModalVisible(true)} style={{ marginTop: 12 }}>
           Ver Produtos Adicionados ({products.length})
         </Button>
+        <View style={{  flexDirection: "row", justifyContent: 'center', gap: 52, padding: 10 }}>
+          <Button mode="contained" style={{ marginBottom: 10 }} onPress={onSubmitGeneratePDF}>
+            Gerar PDF
+          </Button>
 
-        <Button mode="contained" style={{ marginTop: 20 }} onPress={onSubmitGeneratePDF}>
-          Gerar PDF
-        </Button>
-
-        <Button mode="contained" style={{ marginTop: 20 }} onPress={onSaveCsvFile}>
-          Gerar CSV
-        </Button>
+          <Button mode="contained" style={{ marginBottom: 10 }} onPress={onSaveCsvFile}>
+            Gerar CSV
+          </Button>
+        </View>
 
       </ScrollView>
 
