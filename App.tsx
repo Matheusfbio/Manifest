@@ -1,8 +1,13 @@
 import { StatusBar } from 'expo-status-bar';
-
-import Home from '@/app/index';
+import { preventAutoHideAsync, hideAsync } from 'expo-splash-screen';
 
 import './global.css';
+import Home from '@/app/index';
+
+preventAutoHideAsync(); // Evita que a Splash Screen suma automaticamente
+
+// Depois, quando seu app estiver pronto:
+hideAsync();
 
 export default function App() {
   return (
@@ -12,3 +17,34 @@ export default function App() {
     </>
   );
 }
+
+// import * as Print from 'expo-print';
+// import * as Sharing from 'expo-sharing';
+// import React from 'react';
+// import { Button, View } from 'react-native';
+
+// export default function App() {
+//   const generateAndSharePDF = async () => {
+//     const htmlContent = `
+//       <html>
+//         <body>
+//           <h1>Exemplo de PDF</h1>
+//           <p>Este é um exemplo de conteúdo em PDF.</p>
+//         </body>
+//       </html>
+//     `;
+
+//     try {
+//       const { uri } = await Print.printToFileAsync({ html: htmlContent });
+//       await Sharing.shareAsync(uri);
+//     } catch (error) {
+//       console.error('Erro ao gerar ou compartilhar o PDF:', error);
+//     }
+//   };
+
+//   return (
+//     <View className="mt-10 flex items-center justify-center">
+//       <Button title="Gerar e Compartilhar PDF" onPress={generateAndSharePDF} />
+//     </View>
+//   );
+// }

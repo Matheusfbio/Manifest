@@ -2,7 +2,7 @@
   "expo": {
     "name": "relatory",
     "slug": "relatory",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "web": {
       "favicon": "./assets/favicon.png"
     },
@@ -12,15 +12,9 @@
     "plugins": [],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "userInterfaceStyle": "auto",
+
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.matheusfabio.relatory"
@@ -30,7 +24,19 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "permissions": ["READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"],
       "package": "com.matheusfabio.relatory"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "43d63876-ddc1-4e7f-bf61-4fb4ba272d57"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/43d63876-ddc1-4e7f-bf61-4fb4ba272d57"
     }
   }
 }
