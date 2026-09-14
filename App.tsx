@@ -1,5 +1,5 @@
-import { StatusBar } from 'expo-status-bar';
 import { preventAutoHideAsync, hideAsync } from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 
 import './global.css';
 import Home from '@/app/index';
