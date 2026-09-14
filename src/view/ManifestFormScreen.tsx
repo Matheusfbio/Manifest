@@ -1,11 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as FileSystem from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import React, { useState, useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Alert, FlatList, Modal, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import {
   TextInput,
   Button,
@@ -17,31 +18,39 @@ import {
 } from 'react-native-paper';
 import { z } from 'zod';
 
-const STORAGE_KEY = '@manifest_products';
+import { useManifestStore, type ManifestProduct } from '../store/manifest';
 
-type ManifestForm = {
-  productName: string;
-  lote: string;
-  unit: string;
-  type: 'entrada' | 'saida';
-  date: string;
-  validade: string;
-  responsible: string;
-  observations?: string;
+const toDisplay = (iso: string) => {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
 };
+
+const toISO = (date: Date) => date.toISOString().split('T')[0];
+
+type ManifestForm = Omit<ManifestProduct, 'id' | 'createdAt'>;
 
 const schema = z.object({
   productName: z.string().min(1, 'Nome do produto é obrigatório'),
   lote: z.string().min(1, 'Lote obrigatório'),
   unit: z.string().min(1, 'Unidade obrigatória'),
-  type: z.enum(['entrada', 'saida'], {
-    required_error: 'Tipo obrigatório',
-  }),
+  type: z.enum(['entrada', 'saida'], { required_error: 'Tipo obrigatório' }),
   date: z.string().min(1, 'Data obrigatória'),
   validade: z.string().min(1, 'Validade obrigatória'),
   responsible: z.string().min(1, 'Responsável obrigatório'),
   observations: z.string().optional(),
 });
+
+const defaultValues: ManifestForm = {
+  productName: '',
+  lote: '',
+  unit: '',
+  type: 'entrada',
+  date: toISO(new Date()),
+  validade: toISO(new Date()),
+  responsible: '',
+  observations: '',
+};
 
 const styles = StyleSheet.create({
   modalBackground: {
@@ -64,116 +73,30 @@ const styles = StyleSheet.create({
   },
 });
 
-const categorizeProducts = (products: ManifestForm[]) => {
-  return {
-    gray: products.filter((p) => Number(p.unit) >= 35),
-    green: products.filter((p) => Number(p.unit) >= 25 && Number(p.unit) < 35),
-    yellow: products.filter((p) => Number(p.unit) >= 15 && Number(p.unit) < 25),
-    red: products.filter((p) => Number(p.unit) < 15),
-  };
-};
-
-const categorizeProductsByDate = (products: ManifestForm[]) => {
+const categorizeProductsByExpiration = (products: ManifestProduct[]) => {
   const today = new Date();
+  const daysTo = (p: ManifestProduct) =>
+    Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
   return {
-    expired: products.filter((p) => new Date(p.validade) < today),
-    nearExpiration: products.filter(
-      (p) =>
-        new Date(p.validade) >= today &&
-        new Date(p.validade) <= new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000) // Próximos 7 dias
-    ),
-    valid: products.filter((p) => new Date(p.validade) > new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)),
-  };
-};
-
-const categorizeProductsWithDays = (products: ManifestForm[]) => {
-  const today = new Date();
-
-  return {
-    gray: products
-      .filter((p) => {
-        const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        return Number(p.unit) >= 35 && daysToExpire > 0;
-      })
-      .map((p) => ({
-        ...p,
-        daysToExpire: Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
-      })),
+    gray: products.filter((p) => daysTo(p) > 35).map((p) => ({ ...p, daysToExpire: daysTo(p) })),
     green: products
-      .filter((p) => {
-        const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        return Number(p.unit) >= 25 && Number(p.unit) < 35 && daysToExpire > 0;
-      })
-      .map((p) => ({
-        ...p,
-        daysToExpire: Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
-      })),
+      .filter((p) => daysTo(p) > 25 && daysTo(p) <= 35)
+      .map((p) => ({ ...p, daysToExpire: daysTo(p) })),
     yellow: products
-      .filter((p) => {
-        const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        return Number(p.unit) >= 15 && Number(p.unit) < 25 && daysToExpire > 0;
-      })
-      .map((p) => ({
-        ...p,
-        daysToExpire: Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
-      })),
-    red: products
-      .filter((p) => {
-        const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        return Number(p.unit) < 15 || daysToExpire <= 0;
-      })
-      .map((p) => ({
-        ...p,
-        daysToExpire: Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
-      })),
-  };
-};
-
-const categorizeProductsByExpiration = (products: ManifestForm[]) => {
-  const today = new Date();
-
-  return {
-    gray: products
-      .filter((p) => {
-        const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        return daysToExpire > 35;
-      })
-      .map((p) => ({
-        ...p,
-        daysToExpire: Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
-      })),
-    green: products
-      .filter((p) => {
-        const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        return daysToExpire > 25 && daysToExpire <= 35;
-      })
-      .map((p) => ({
-        ...p,
-        daysToExpire: Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
-      })),
-    yellow: products
-      .filter((p) => {
-        const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        return daysToExpire > 15 && daysToExpire <= 25;
-      })
-      .map((p) => ({
-        ...p,
-        daysToExpire: Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
-      })),
-    red: products
-      .filter((p) => {
-        const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        return daysToExpire <= 15;
-      })
-      .map((p) => ({
-        ...p,
-        daysToExpire: Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
-      })),
+      .filter((p) => daysTo(p) > 15 && daysTo(p) <= 25)
+      .map((p) => ({ ...p, daysToExpire: daysTo(p) })),
+    red: products.filter((p) => daysTo(p) <= 15).map((p) => ({ ...p, daysToExpire: daysTo(p) })),
   };
 };
 
 export default function ManifestFormScreen() {
+  const { products, loaded, load, add, update, remove, clear } = useManifestStore();
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [pickerField, setPickerField] = useState<'date' | 'validade' | null>(null);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+
   const {
     control,
     handleSubmit,
@@ -181,146 +104,81 @@ export default function ManifestFormScreen() {
     formState: { errors },
   } = useForm<ManifestForm>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      productName: '',
-      lote: '',
-      unit: '',
-      type: 'entrada',
-      date: new Date().toISOString().split('T')[0],
-      validade: new Date().toISOString().split('T')[0],
-      responsible: '',
-      observations: '',
-    },
+    defaultValues,
   });
 
-  const [products, setProducts] = useState<ManifestForm[]>([]);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  
+  useEffect(() => {
+    load();
+  }, []);
 
-  const onAddOrUpdateProduct = (data: ManifestForm) => {
-    if (editingIndex !== null) {
-      const updated = [...products];
-      updated[editingIndex] = data;
-      setProducts(updated);
-      setEditingIndex(null);
+  const onAddOrUpdateProduct = async (data: ManifestForm) => {
+    if (editingId !== null) {
+      await update(editingId, data);
+      setEditingId(null);
     } else {
-      setProducts([...products, data]);
+      await add(data);
     }
-
-    reset({
-      productName: '',
-      lote: '',
-      unit: '',
-      type: 'entrada',
-      date: new Date().toISOString().split('T')[0],
-      validade: new Date().toISOString().split('T')[0],
-      responsible: '',
-      observations: '',
-    });
+    reset(defaultValues);
   };
 
-  const onEditProduct = (index: number) => {
-    const product = products[index];
-    reset(product);
-    setEditingIndex(index);
+  const onEditProduct = (product: ManifestProduct) => {
+    const { id, createdAt, ...form } = product;
+    reset(form);
+    setEditingId(id);
     setModalVisible(false);
   };
 
-  const onDeleteProduct = (index: number) => {
-    const updated = [...products];
-    updated.splice(index, 1);
-    setProducts(updated);
-  };
+  const onDeleteProduct = (id: string) => remove(id);
 
   const onSubmitGeneratePDF = async () => {
-    if (products.length === 0) {
+    if (!loaded || products.length === 0) {
       Alert.alert('Atenção', 'Adicione ao menos um produto para gerar o PDF');
       return;
     }
-
     try {
       const today = new Date();
       const htmlRows = products
         .map((p, index) => {
-          const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          const daysToExpire = Math.ceil(
+            (new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+          );
           const color =
             daysToExpire > 35
-              ? '#A9A9A9' // Cinza
+              ? '#A9A9A9'
               : daysToExpire > 25
-              ? '#4CAF50' // Verde
-              : daysToExpire > 15
-              ? '#FFEB3B' // Amarelo
-              : '#F44336'; // Vermelho
-
+                ? '#4CAF50'
+                : daysToExpire > 15
+                  ? '#FFEB3B'
+                  : '#F44336';
           return `
             <tr style="color: ${color}">
-              <td>${index + 1}</td>
-              <td>${p.productName}</td>
-              <td>${p.lote}</td>
-              <td>${p.unit}</td>
-              <td>${p.type}</td>
-              <td>${p.date}</td>
-              <td>${p.validade}</td>
+              <td>${index + 1}</td><td>${p.productName}</td><td>${p.lote}</td>
+              <td>${p.unit}</td><td>${p.type}</td><td>${p.date}</td><td>${p.validade}</td>
               <td>${daysToExpire > 0 ? `${daysToExpire} dias` : 'Vencido'}</td>
-              <td>${p.responsible}</td>
-              <td>${p.observations || 'Nenhuma'}</td>
-            </tr>
-          `;
+              <td>${p.responsible}</td><td>${p.observations || 'Nenhuma'}</td>
+            </tr>`;
         })
         .join('');
 
       const htmlContent = `
-        <html>
-          <head>
-            <style>
-              table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 20px;
-              }
-              th, td {
-                border: 1px solid #ddd;
-                padding: 8px;
-                text-align: left;
-              }
-              th {
-                background-color: #f4f4f4;
-                font-weight: bold;
-              }
-              h1 {
-                text-align: center;
-                font-family: Arial, sans-serif;
-              }
-            </style>
-          </head>
-          <body>
-            <h1>Manifesto de Produtos</h1>
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Produto</th>
-                  <th>Lote</th>
-                  <th>Unidade</th>
-                  <th>Tipo</th>
-                  <th>Data</th>
-                  <th>Validade</th>
-                  <th>Dias para Vencer</th>
-                  <th>Responsável</th>
-                  <th>Observações</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${htmlRows}
-              </tbody>
-            </table>
-          </body>
-        </html>
-      `;
+        <html><head><style>
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f4f4f4; font-weight: bold; }
+          h1 { text-align: center; font-family: Arial, sans-serif; }
+        </style></head>
+        <body>
+          <h1>Manifesto de Produtos</h1>
+          <table>
+            <thead><tr>
+              <th>#</th><th>Produto</th><th>Lote</th><th>Unidade</th><th>Tipo</th>
+              <th>Data</th><th>Validade</th><th>Dias para Vencer</th><th>Responsável</th><th>Observações</th>
+            </tr></thead>
+            <tbody>${htmlRows}</tbody>
+          </table>
+        </body></html>`;
 
       const { uri } = await Print.printToFileAsync({ html: htmlContent });
-
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri);
       } else {
@@ -331,19 +189,21 @@ export default function ManifestFormScreen() {
       alert('Erro ao gerar PDF');
     }
   };
-  
+
   const onSaveCsvFile = async () => {
-    if (products.length === 0) {
+    if (!loaded || products.length === 0) {
       alert('Adicione ao menos um produto para gerar o CSV');
       return;
     }
-  
     try {
       const today = new Date();
-      const csvHeader = 'ID,Produto,Lote,Unidade,Tipo,Data,Validade,Dias para Vencer,Responsável,Observações\n';
+      const csvHeader =
+        'ID,Produto,Lote,Unidade,Tipo,Data,Validade,Dias para Vencer,Responsável,Observações\n';
       const csvRows = products
         .map((p, index) => {
-          const daysToExpire = Math.ceil((new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          const daysToExpire = Math.ceil(
+            (new Date(p.validade).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+          );
           return [
             index + 1,
             p.productName,
@@ -360,14 +220,12 @@ export default function ManifestFormScreen() {
             .join(',');
         })
         .join('\n');
-  
-      const csvContent = csvHeader + csvRows;
-  
+
       const fileUri = FileSystem.documentDirectory + 'manifesto_produtos.csv';
-      await FileSystem.writeAsStringAsync(fileUri, csvContent, {
+      await FileSystem.writeAsStringAsync(fileUri, csvHeader + csvRows, {
         encoding: FileSystem.EncodingType.UTF8,
       });
-  
+
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri);
       } else {
@@ -378,68 +236,88 @@ export default function ManifestFormScreen() {
       alert('Erro ao gerar CSV');
     }
   };
-  
-
-  const saveProductsToStorage = async (data: ManifestForm[]) => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (error) {
-      console.error('Erro ao salvar os produtos:', error);
-    }
-  };
-
-  const loadProductsFromStorage = async () => {
-    try {
-      const storedData = await AsyncStorage.getItem(STORAGE_KEY);
-      if (storedData) {
-        setProducts(JSON.parse(storedData));
-      }
-    } catch (error) {
-      console.error('Erro ao carregar os produtos:', error);
-    }
-  };
-
-  useEffect(() => {
-    loadProductsFromStorage();
-  }, []);
-
-  useEffect(() => {
-    saveProductsToStorage(products);
-  }, [products]);
 
   return (
     <Provider>
       <Text variant="titleLarge" style={{ marginLeft: 25, marginBottom: 20, marginTop: 40 }}>
-        {editingIndex !== null ? 'Editar Produto' : 'Novo Manifesto'}
+        {editingId !== null ? 'Editar Produto' : 'Novo Manifesto'}
       </Text>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 24 }}>
-
-        {[
-          { name: 'productName', label: 'Nome do Produto' },
-          { name: 'lote', label: 'Lote' },
-          { name: 'unit', label: 'Unidade' },
-          { name: 'responsible', label: 'Responsável' },
-          { name: 'date', label: 'Data de hoje' },
-          { name: 'validade', label: 'Validade' },
-        ].map(({ name, label }) => (
+      <KeyboardAwareScrollView
+        contentContainerStyle={{ paddingHorizontal: 24 }}
+        enableOnAndroid
+        extraScrollHeight={120}
+        keyboardShouldPersistTaps="handled">
+        {(
+          [
+            { name: 'productName', label: 'Nome do Produto' },
+            { name: 'lote', label: 'Lote' },
+            { name: 'unit', label: 'Unidade' },
+            { name: 'responsible', label: 'Responsável' },
+          ] as const
+        ).map(({ name, label }) => (
           <React.Fragment key={name}>
             <Controller
               control={control}
-              name={name as keyof ManifestForm}
+              name={name}
               render={({ field: { onChange, value } }) => (
                 <TextInput
                   label={label}
                   mode="outlined"
                   value={value}
                   onChangeText={onChange}
-                  error={!!errors[name as keyof ManifestForm]}
+                  onFocus={() => setFocusedField(name)}
+                  onBlur={() => setFocusedField(null)}
+                  activeOutlineColor="#6200ee"
+                  outlineColor={focusedField === name ? '#6200ee' : '#ccc'}
+                  error={!!errors[name]}
                 />
               )}
             />
-            <HelperText type="error" visible={!!errors[name as keyof ManifestForm]}>
-              {errors[name as keyof ManifestForm]?.message?.toString()}
+            <HelperText type="error" visible={!!errors[name]}>
+              {errors[name]?.message}
             </HelperText>
           </React.Fragment>
+        ))}
+
+        {(['date', 'validade'] as const).map((fieldName) => (
+          <Controller
+            key={fieldName}
+            control={control}
+            name={fieldName}
+            render={({ field: { onChange, value } }) => (
+              <>
+                <Pressable onPress={() => setPickerField(fieldName)}>
+                  <TextInput
+                    label={fieldName === 'date' ? 'Data de hoje' : 'Validade'}
+                    mode="outlined"
+                    value={toDisplay(value)}
+                    editable={false}
+                    pointerEvents="none"
+                    activeOutlineColor="#6200ee"
+                    outlineColor={pickerField === fieldName ? '#6200ee' : '#ccc'}
+                    right={
+                      <TextInput.Icon icon="calendar" onPress={() => setPickerField(fieldName)} />
+                    }
+                    error={!!errors[fieldName]}
+                  />
+                </Pressable>
+                <HelperText type="error" visible={!!errors[fieldName]}>
+                  {errors[fieldName]?.message}
+                </HelperText>
+                {pickerField === fieldName && (
+                  <DateTimePicker
+                    value={value ? new Date(value) : new Date()}
+                    mode="date"
+                    display="calendar"
+                    onChange={(_, selected) => {
+                      setPickerField(null);
+                      if (selected) onChange(toISO(selected));
+                    }}
+                  />
+                )}
+              </>
+            )}
+          />
         ))}
 
         <Text style={{ marginTop: 10, marginBottom: 5 }}>Tipo:</Text>
@@ -470,6 +348,10 @@ export default function ManifestFormScreen() {
               mode="outlined"
               value={value ?? ''}
               onChangeText={onChange}
+              onFocus={() => setFocusedField('observations')}
+              onBlur={() => setFocusedField(null)}
+              activeOutlineColor="#6200ee"
+              outlineColor={focusedField === 'observations' ? '#6200ee' : '#ccc'}
               multiline
               numberOfLines={4}
             />
@@ -480,25 +362,23 @@ export default function ManifestFormScreen() {
           mode="contained"
           style={{ marginTop: 20 }}
           onPress={handleSubmit(onAddOrUpdateProduct)}>
-          {editingIndex !== null ? 'Atualizar Produto' : 'Adicionar Produto'}
+          {editingId !== null ? 'Atualizar Produto' : 'Adicionar Produto'}
         </Button>
 
         <Button mode="outlined" onPress={() => setModalVisible(true)} style={{ marginTop: 12 }}>
-          Ver Produtos Adicionados ({products.length})
+          Ver Produtos Adicionados ({loaded ? products.length : '...'})
         </Button>
-        <View style={{  flexDirection: "row", justifyContent: 'center', gap: 52, padding: 10 }}>
+
+        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 52, padding: 10 }}>
           <Button mode="contained" style={{ marginBottom: 10 }} onPress={onSubmitGeneratePDF}>
             Gerar PDF
           </Button>
-
           <Button mode="contained" style={{ marginBottom: 10 }} onPress={onSaveCsvFile}>
             Gerar CSV
           </Button>
         </View>
+      </KeyboardAwareScrollView>
 
-      </ScrollView>
-
-      {/* Modal */}
       <Portal>
         <Modal
           visible={modalVisible}
@@ -519,28 +399,28 @@ export default function ManifestFormScreen() {
                       fontWeight: 'bold',
                       color:
                         category === 'gray'
-                          ? '#A9A9A9' // Cinza
+                          ? '#A9A9A9'
                           : category === 'green'
-                          ? '#4CAF50' // Verde
-                          : category === 'yellow'
-                          ? '#FFEB3B' // Amarelo
-                          : '#F44336', // Vermelho
+                            ? '#4CAF50'
+                            : category === 'yellow'
+                              ? '#FFEB3B'
+                              : '#F44336',
                     }}>
                     {category === 'gray'
                       ? 'Cinza (35 dias ou mais)'
                       : category === 'green'
-                      ? 'Verde (25 a 35 dias)'
-                      : category === 'yellow'
-                      ? 'Amarelo (15 a 25 dias)'
-                      : 'Vermelho (15 dias ou menos)'}
+                        ? 'Verde (25 a 35 dias)'
+                        : category === 'yellow'
+                          ? 'Amarelo (15 a 25 dias)'
+                          : 'Vermelho (15 dias ou menos)'}
                   </Text>
                   {items.map((item, index) => (
-                    <View key={index} style={styles.productItem}>
+                    <View key={item.id} style={styles.productItem}>
                       <Text style={{ flex: 1 }}>
-                        {index + 1}. Pt: {item.productName} - Faltam {item.daysToExpire} dias para vencer
+                        {index + 1}. {item.productName} - Faltam {item.daysToExpire} dias
                       </Text>
-                      <Button onPress={() => onEditProduct(index)}>✏️</Button>
-                      <Button onPress={() => onDeleteProduct(index)} textColor="red">
+                      <Button onPress={() => onEditProduct(item)}>✏️</Button>
+                      <Button onPress={() => onDeleteProduct(item.id)} textColor="red">
                         🗑️
                       </Button>
                     </View>
@@ -548,14 +428,7 @@ export default function ManifestFormScreen() {
                 </View>
               ))}
 
-              <Button
-                onPress={async () => {
-                  await AsyncStorage.removeItem(STORAGE_KEY);
-                  setProducts([]);
-                }}>
-                Limpar Produtos Salvos
-              </Button>
-
+              <Button onPress={clear}>Limpar Produtos Salvos</Button>
               <Button onPress={() => setModalVisible(false)} style={{ marginTop: 10 }}>
                 Fechar
               </Button>

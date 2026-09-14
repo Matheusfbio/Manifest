@@ -51,9 +51,7 @@ export const useManifestStore = create<ManifestStore>((set, get) => ({
   },
 
   update: async (id, product) => {
-    const products = get().products.map((p) =>
-      p.id === id ? { ...p, ...product } : p
-    );
+    const products = get().products.map((p) => (p.id === id ? { ...p, ...product } : p));
     set({ products });
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(products));
   },

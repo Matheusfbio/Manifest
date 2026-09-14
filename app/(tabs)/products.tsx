@@ -143,8 +143,15 @@ export default function ProductsScreen() {
       .map((p) => {
         const days = getDaysToExpire(p.validade);
         return [
-          p.productName, p.lote, p.unit, p.type, p.date, p.validade,
-          days > 0 ? `${days} dias` : 'Vencido', p.responsible, p.observations || '',
+          p.productName,
+          p.lote,
+          p.unit,
+          p.type,
+          p.date,
+          p.validade,
+          days > 0 ? `${days} dias` : 'Vencido',
+          p.responsible,
+          p.observations || '',
         ]
           .map((f) => `"${f}"`)
           .join(',');
@@ -159,51 +166,53 @@ export default function ProductsScreen() {
 
   return (
     <View style={{ flex: 1, paddingHorizontal: 16 }}>
-        <Text variant="titleLarge" style={{ marginTop: 56, marginBottom: 12 }}>
-          Produtos ({products.length})
-        </Text>
+      <Text variant="titleLarge" style={{ marginTop: 56, marginBottom: 12 }}>
+        Produtos ({products.length})
+      </Text>
 
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-          {([
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        {(
+          [
             { key: 'recent', label: 'Últimos adicionados' },
             { key: 'validade', label: 'Data de vencimento' },
             { key: 'dias', label: 'Dias restantes' },
-          ] as { key: Filter; label: string }[]).map(({ key, label }) => (
-            <Chip
-              key={key}
-              selected={filter === key}
-              onPress={() => setFilter(key)}
-              style={{ marginBottom: 4 }}>
-              {label}
-            </Chip>
-          ))}
-        </View>
+          ] as { key: Filter; label: string }[]
+        ).map(({ key, label }) => (
+          <Chip
+            key={key}
+            selected={filter === key}
+            onPress={() => setFilter(key)}
+            style={{ marginBottom: 4 }}>
+            {label}
+          </Chip>
+        ))}
+      </View>
 
-        <Divider style={{ marginBottom: 12 }} />
+      <Divider style={{ marginBottom: 12 }} />
 
-        <FlatList
-          data={sorted}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <ProductCard item={item} onDelete={confirmDelete} />}
-          ListEmptyComponent={
-            <Text style={{ textAlign: 'center', color: '#999', marginTop: 40 }}>
-              Nenhum produto cadastrado
-            </Text>
-          }
-          contentContainerStyle={{ paddingBottom: 16 }}
-        />
+      <FlatList
+        data={sorted}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => <ProductCard item={item} onDelete={confirmDelete} />}
+        ListEmptyComponent={
+          <Text style={{ textAlign: 'center', color: '#999', marginTop: 40 }}>
+            Nenhum produto cadastrado
+          </Text>
+        }
+        contentContainerStyle={{ paddingBottom: 16 }}
+      />
 
-        <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 12 }}>
-          <Button mode="contained" onPress={generatePDF} style={{ flex: 1 }}>
-            PDF
-          </Button>
-          <Button mode="contained" onPress={generateCSV} style={{ flex: 1 }}>
-            CSV
-          </Button>
-          <Button mode="outlined" onPress={confirmClear} textColor="#F44336" style={{ flex: 1 }}>
-            Limpar
-          </Button>
-        </View>
+      <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 12 }}>
+        <Button mode="contained" onPress={generatePDF} style={{ flex: 1 }}>
+          PDF
+        </Button>
+        <Button mode="contained" onPress={generateCSV} style={{ flex: 1 }}>
+          CSV
+        </Button>
+        <Button mode="outlined" onPress={confirmClear} textColor="#F44336" style={{ flex: 1 }}>
+          Limpar
+        </Button>
+      </View>
     </View>
   );
 }

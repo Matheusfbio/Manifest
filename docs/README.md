@@ -2,6 +2,10 @@
 
 Aplicativo React Native (Expo) para controle de entrada e saída de produtos com manifesto, geração de relatórios e autenticação por biometria ou senha.
 
+## Demo
+
+https://github.com/user-attachments/assets/demo.mp4
+
 ---
 
 ## Tecnologias

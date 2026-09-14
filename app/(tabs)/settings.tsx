@@ -107,12 +107,10 @@ export default function SettingsScreen() {
       {Platform.OS !== 'web' && biometricAvailable && (
         <>
           <Divider style={{ marginVertical: 16 }} />
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View
+            style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <Text variant="titleSmall">Usar Biometria</Text>
-            <Switch
-              value={biometricEnabled}
-              onValueChange={setBiometricEnabled}
-            />
+            <Switch value={biometricEnabled} onValueChange={setBiometricEnabled} />
           </View>
           <Text variant="bodySmall" style={{ color: '#666', marginTop: 4 }}>
             Autentique-se com impressão digital ou Face ID
@@ -142,7 +140,13 @@ export default function SettingsScreen() {
 
       <Divider style={{ marginVertical: 24 }} />
 
-      <Button mode="outlined" textColor="#F44336" onPress={() => { logout(); router.replace('/login'); }}>
+      <Button
+        mode="outlined"
+        textColor="#F44336"
+        onPress={() => {
+          logout();
+          router.replace('/login');
+        }}>
         Sair / Bloquear app
       </Button>
     </ScrollView>

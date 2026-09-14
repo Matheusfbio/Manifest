@@ -88,7 +88,10 @@ export default function LoginScreen() {
               mode="outlined"
               secureTextEntry
               value={password}
-              onChangeText={(v) => { setPassword(v); setError(''); }}
+              onChangeText={(v) => {
+                setPassword(v);
+                setError('');
+              }}
               onSubmitEditing={handlePasswordLogin}
               style={styles.input}
             />
@@ -108,7 +111,10 @@ export default function LoginScreen() {
               mode="outlined"
               secureTextEntry
               value={password}
-              onChangeText={(v) => { setPassword(v); setError(''); }}
+              onChangeText={(v) => {
+                setPassword(v);
+                setError('');
+              }}
               onSubmitEditing={handlePasswordLogin}
               style={[styles.input, { marginTop: 16 }]}
             />
