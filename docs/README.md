@@ -4,7 +4,11 @@ Aplicativo React Native (Expo) para controle de entrada e saída de produtos com
 
 ## Demo
 
-https://github.com/user-attachments/assets/demo.mp4
+
+
+https://github.com/user-attachments/assets/31b7f792-862c-4376-b92a-220c6931dd85
+
+
 
 ---
 
